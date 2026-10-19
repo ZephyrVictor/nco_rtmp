@@ -114,7 +114,7 @@ npm run build
 
 ## Git 维护
 
-本目录使用本地 Git 仓库，默认分支 `main`，尚未配置远程仓库。源码、依赖锁文件、配置模板和 Markdown 文档纳入管理；密码、证书、数据库、录像、原始测试结果、虚拟环境、npm 依赖和构建输出均忽略。
+本目录使用 Git 管理，默认分支 `main`，远程 `origin` 为 [ZephyrVictor/nco_rtmp](https://github.com/ZephyrVictor/nco_rtmp)。源码、依赖锁文件、配置模板和 Markdown 文档纳入管理；密码、证书、数据库、录像、原始测试结果、虚拟环境、npm 依赖和构建输出均忽略。
 
 日常修改后先检查并提交明确的文件：
 
@@ -125,6 +125,7 @@ git add README.md service/app/main.py
 git diff --cached --check
 git diff --cached
 git commit -m "Describe the change"
+git push origin main
 ```
 
-首次基线提交使用自动化作者 `Codex <codex@localhost>`，未修改全局 Git 身份。后续可用自己的身份在当前仓库配置 `git config user.name` 和 `git config user.email`。拿到远程地址后再配置 `origin` 并推送；当前没有发布到任何外部 Git 平台。
+首次基线提交使用自动化作者 `Codex <codex@localhost>`，未修改全局 Git 身份。后续可用自己的身份在当前仓库配置 `git config user.name` 和 `git config user.email`。
