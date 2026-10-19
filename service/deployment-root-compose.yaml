@@ -1,0 +1,4 @@
+name: nco-proctor
+include:
+  - path: ./service/compose.yaml
+    project_directory: ./service

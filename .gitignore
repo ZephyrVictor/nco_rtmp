@@ -1,0 +1,52 @@
+# Local credentials and deployment certificates
+.admin-password
+.admin-password.*
+.env
+.env.*
+!.env.example
+secrets/
+tls/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+service/prometheus.pre-*.yml
+
+# Dependencies, builds and caches
+.venv/
+venv/
+node_modules/
+service/web/dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+
+# Local acceptance artifacts and screenshots
+/capacity-results/
+/test-results/
+/obs-*.png
+playwright-report/
+test-results/
+*.log
+
+# Runtime data and media
+/metadata/
+/metadata-backups/
+/uploads/
+/originals/
+/dvr/
+/exports/
+/recordings/
+*.sqlite
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.mkv
+*.mp4
+*.flv
+*.tmp

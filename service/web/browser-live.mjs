@@ -1,0 +1,57 @@
+import {chromium} from '@playwright/test';
+import {readFile,writeFile} from 'node:fs/promises';
+const cid=process.env.FAULT_CID;
+if(!cid)throw Error('FAULT_CID required');
+const password=(await readFile(new URL('../../.admin-password',import.meta.url),'utf8')).trim();
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const results={cid,errors:[],checks:[]};
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000},ignoreHTTPSErrors:true});
+ page.on('pageerror',e=>results.errors.push(e.message));
+ page.on('console',m=>{if(m.type()==='error')console.log('BROWSER_ERROR',m.text());});
+ page.on('response',r=>{if(r.url().includes('/live/'))console.log('LIVE_HTTP',r.status());});
+ const requests=[];
+ page.on('request',r=>{if(r.url().includes('/live/'+cid+'.flv'))requests.push(r.url());});
+ await page.goto('https://127.0.0.1:18443');
+ await page.getByLabel('账号',{exact:true}).fill('admin');
+ await page.getByLabel('密码',{exact:true}).fill(password);
+ await page.getByRole('button',{name:'登录',exact:true}).click();
+ await page.locator('#search').waitFor();
+ await page.locator('#search').fill(cid);
+ await page.locator('#search').dispatchEvent('change');
+ const tile=page.locator('[data-cid="'+cid+'"]');
+ await tile.waitFor();
+ try {await page.waitForFunction(cid=>{const v=document.querySelector('[data-cid="'+cid+'"] video');return v?.readyState>=2&&v.videoWidth>0;},cid,{timeout:45000});}
+ catch(error){console.log('VIDEO_DEBUG',await page.locator('video').evaluateAll(vs=>vs.map(v=>({width:v.videoWidth,height:v.videoHeight,time:v.currentTime,ready:v.readyState,error:v.error?.message}))));await page.screenshot({path:new URL('../../test-results/live-debug.png',import.meta.url).pathname,fullPage:true});throw error;}
+ const sample=await tile.locator('video').evaluate(v=>{const canvas=document.createElement('canvas');canvas.width=160;canvas.height=104;const context=canvas.getContext('2d');context.drawImage(v,0,0,160,104);const p=context.getImageData(0,0,160,104).data;let min=255,max=0;for(let i=0;i<p.length;i+=4){min=Math.min(min,p[i]);max=Math.max(max,p[i]);}return {width:v.videoWidth,height:v.videoHeight,time:v.currentTime,min,max};});
+ if(sample.max-sample.min<20)throw Error('Blank video frame');
+ results.video=sample;results.checks.push('gateway-player-nonblank');
+ await page.screenshot({path:new URL('../../test-results/live-desktop.png',import.meta.url).pathname,fullPage:true});
+ const oldCount=requests.length;
+ await tile.getByRole('button',{name:'放大画面'}).click();
+ await page.waitForTimeout(2500);
+ if(requests.length!==oldCount)throw Error('Zoom opened another stream');
+ const zoomTime=await page.locator('dialog video').evaluate(v=>v.currentTime);
+ if(zoomTime<=sample.time)throw Error('Video not advancing');
+ results.checks.push('video-advances','zoom-reuses-player');
+ await page.getByRole('button',{name:'关闭',exact:true}).click();
+ await page.waitForFunction(({cid,time})=>{const v=document.querySelector('[data-cid="'+cid+'"] video');return v?.readyState>=2&&v.currentTime>time+.5;},{cid,time:zoomTime},{timeout:15000});
+ if(requests.length!==oldCount)throw Error('Closing zoom opened another stream');
+ results.checks.push('zoom-close-preserves-playback');
+ await page.setViewportSize({width:390,height:844});
+ await page.screenshot({path:new URL('../../test-results/live-mobile.png',import.meta.url).pathname,fullPage:true});
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Mobile overflow');
+ results.checks.push('mobile-live-layout');
+ await page.context().setOffline(true);
+ await page.waitForTimeout(12000);
+ const resumed=page.waitForRequest(r=>r.url().includes('/live/'+cid+'.flv'),{timeout:45000});
+ await page.context().setOffline(false);
+ await resumed;
+ await page.waitForFunction(cid=>{const v=document.querySelector('[data-cid="'+cid+'"] video');return v?.readyState>=2&&v.currentTime>0;},cid,{timeout:45000});
+ const restoredTime=await tile.locator('video').evaluate(v=>v.currentTime);
+ await page.waitForFunction(({cid,time})=>{const v=document.querySelector('[data-cid="'+cid+'"] video');return v?.readyState>=2&&v.currentTime>time+.5;},{cid,time:restoredTime},{timeout:15000});
+ results.checks.push('browser-offline-reconnect');
+ if(results.errors.length)throw Error(results.errors.join('\n'));
+ await writeFile(new URL('../../test-results/browser-live-results.json',import.meta.url),JSON.stringify(results,null,2));
+ console.log(JSON.stringify(results));
+}finally{await browser.close();}
